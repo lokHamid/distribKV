@@ -15,6 +15,8 @@ public final class NodeRunnerConfig {
     private final Path dataDir;
     private final int raftPort;
     private final int telemetryPort;
+    private final int adminPort;
+    private final String host;
     private final int heartbeatIntervalMs;
     private final int minElectionTimeoutMs;
     private final int maxElectionTimeoutMs;
@@ -22,7 +24,16 @@ public final class NodeRunnerConfig {
     private final long snapshotThreshold;
 
     public NodeRunnerConfig(String nodeId, Map<String, String> peerAddresses, Path dataDir,
-                            int raftPort, int telemetryPort,
+                            int raftPort, int telemetryPort, int adminPort,
+                            int heartbeatIntervalMs, int minElectionTimeoutMs, int maxElectionTimeoutMs,
+                            int maxEntriesPerAppend, long snapshotThreshold) {
+        this(nodeId, peerAddresses, dataDir, raftPort, telemetryPort, adminPort, "127.0.0.1",
+                heartbeatIntervalMs, minElectionTimeoutMs, maxElectionTimeoutMs,
+                maxEntriesPerAppend, snapshotThreshold);
+    }
+
+    public NodeRunnerConfig(String nodeId, Map<String, String> peerAddresses, Path dataDir,
+                            int raftPort, int telemetryPort, int adminPort, String host,
                             int heartbeatIntervalMs, int minElectionTimeoutMs, int maxElectionTimeoutMs,
                             int maxEntriesPerAppend, long snapshotThreshold) {
         this.nodeId = nodeId;
@@ -30,6 +41,8 @@ public final class NodeRunnerConfig {
         this.dataDir = dataDir;
         this.raftPort = raftPort;
         this.telemetryPort = telemetryPort;
+        this.adminPort = adminPort;
+        this.host = host;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.minElectionTimeoutMs = minElectionTimeoutMs;
         this.maxElectionTimeoutMs = maxElectionTimeoutMs;
@@ -42,6 +55,8 @@ public final class NodeRunnerConfig {
     public Path getDataDir() { return dataDir; }
     public int getRaftPort() { return raftPort; }
     public int getTelemetryPort() { return telemetryPort; }
+    public int getAdminPort() { return adminPort; }
+    public String getHost() { return host; }
     public int getHeartbeatIntervalMs() { return heartbeatIntervalMs; }
     public int getMinElectionTimeoutMs() { return minElectionTimeoutMs; }
     public int getMaxElectionTimeoutMs() { return maxElectionTimeoutMs; }

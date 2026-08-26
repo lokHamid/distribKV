@@ -28,6 +28,7 @@ public class ClusterSupervisor {
     private final Map<String, NodeRunner> runners = new LinkedHashMap<>();
     private final List<String> allNodeIds = new ArrayList<>();
     private final ChaosRules rules = new ChaosRules();
+    private ChaosAdminServer adminServer;
 
     public NodeRunner addNode(NodeRunnerConfig config) {
         NodeRunner runner = new NodeRunner(config, rules);
@@ -42,6 +43,7 @@ public class ClusterSupervisor {
 
     public void stopAll() {
         runners.values().forEach(NodeRunner::stop);
+        stopAdminServer();
     }
 
     public Collection<NodeRunner> runners() { return runners.values(); }
@@ -60,6 +62,75 @@ public class ClusterSupervisor {
 
     public ChaosController controller() {
         return new ClusterController();
+    }
+
+    // ------------------------------------------------------------------ admin/control plane
+
+    /** Builds the cluster description (name, cluster admin port, per-node endpoints). */
+    public ClusterDescriptor clusterDescriptor(String name, int adminPort) {
+        List<ClusterDescriptor.NodeEndpoint> endpoints = new ArrayList<>();
+        for (NodeRunner runner : runners.values()) {
+            endpoints.add(new ClusterDescriptor.NodeEndpoint(
+                    runner.getNodeId(), runner.getHost(), runner.getRaftPort(),
+                    runner.getTelemetryPort(), runner.getAdminPort()));
+        }
+        return new ClusterDescriptor(name, adminPort, endpoints);
+    }
+
+    /** Starts a single cluster-wide admin server on {@code port} (single-JVM mode). */
+    public int startAdminServer(int port) {
+        stopAdminServer();
+        try {
+            adminServer = new ChaosAdminServer(port, clusterAdminBackend());
+            adminServer.start();
+            return adminServer.getPort();
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Failed to start cluster admin server", e);
+        }
+    }
+
+    public int getAdminPort() {
+        return adminServer != null ? adminServer.getPort() : -1;
+    }
+
+    public void stopAdminServer() {
+        if (adminServer != null) {
+            adminServer.stop();
+            adminServer = null;
+        }
+    }
+
+    private AdminBackend clusterAdminBackend() {
+        return new AdminBackend() {
+            @Override
+            public List<NodeStatus> statuses() {
+                List<NodeStatus> out = new ArrayList<>();
+                for (NodeRunner runner : runners.values()) {
+                    out.add(NodeStatus.fromNode(runner.getNodeId(), runner.getNode()));
+                }
+                return out;
+            }
+            @Override
+            public List<NodeMetrics> metrics() {
+                List<NodeMetrics> out = new ArrayList<>();
+                for (NodeRunner runner : runners.values()) {
+                    out.add(new NodeMetrics(runner.getNodeId(), runner.getMetricsCollector().snapshot()));
+                }
+                return out;
+            }
+            @Override
+            public ClusterDescriptor cluster() {
+                return clusterDescriptor("distrokv", getAdminPort());
+            }
+            @Override
+            public ChaosController controller() {
+                return new ClusterController();
+            }
+            @Override
+            public ChaosScenario scenarioByName(String name) {
+                return ClusterScenarios.byName(name);
+            }
+        };
     }
 
     private void publishAcrossCluster(EventType type, Map<String, String> metadata) {

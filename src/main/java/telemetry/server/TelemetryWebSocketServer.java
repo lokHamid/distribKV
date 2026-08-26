@@ -27,6 +27,9 @@ public class TelemetryWebSocketServer extends WebSocketServer {
         super(new InetSocketAddress(port));
         this.bus = bus;
         setReuseAddr(true);
+        // Don't let the Java-WebSocket idle/ping watchdog drop healthy dashboard
+        // connections between events — the app reconnects anyway.
+        setConnectionLostTimeout(0);
     }
 
     @Override

@@ -31,6 +31,8 @@ public final class ClusterSupervisorMain {
 
     private static final int BASE_RAFT_PORT = 7200;
     private static final int BASE_TELEMETRY_PORT = 8200;
+    private static final int BASE_ADMIN_PORT = 9200;
+    private static final int CLUSTER_ADMIN_PORT = 9000;
     private static final int PORT_STEP = 20;
 
     public static void main(String[] args) throws Exception {
@@ -44,10 +46,12 @@ public final class ClusterSupervisorMain {
 
         Map<String, Integer> raftPort = new LinkedHashMap<>();
         Map<String, Integer> telemetryPort = new LinkedHashMap<>();
+        Map<String, Integer> adminPort = new LinkedHashMap<>();
         for (int i = 0; i < nodeCount; i++) {
             String id = "node-" + (i + 1);
             raftPort.put(id, BASE_RAFT_PORT + i * PORT_STEP);
             telemetryPort.put(id, BASE_TELEMETRY_PORT + i * PORT_STEP);
+            adminPort.put(id, BASE_ADMIN_PORT + i * PORT_STEP);
         }
 
         Map<String, String> allAddresses = new LinkedHashMap<>();
@@ -62,11 +66,19 @@ public final class ClusterSupervisorMain {
             peers.remove(id);
             supervisor.addNode(new NodeRunnerConfig(
                     id, peers, root.resolve(id),
-                    raftPort.get(id), telemetryPort.get(id),
+                    raftPort.get(id), telemetryPort.get(id), adminPort.get(id),
                     60, 200, 400, 100, 0));
         }
 
-        startupBanner(supervisor, telemetryPort);
+        // expose a cluster-wide control plane for the dashboard
+        supervisor.startAdminServer(CLUSTER_ADMIN_PORT);
+
+        // write a machine-readable descriptor so a dashboard can discover endpoints
+        ClusterDescriptor descriptor = supervisor.clusterDescriptor("distrokv", supervisor.getAdminPort());
+        descriptor.writeTo(root.resolve("cluster.json"));
+        Path clusterJson = root.resolve("cluster.json");
+
+        startupBanner(supervisor, telemetryPort, adminPort, supervisor.getAdminPort(), clusterJson);
         supervisor.startAll();
 
         runConsole(supervisor);
@@ -182,27 +194,17 @@ public final class ClusterSupervisorMain {
     }
 
     private static chaos_harness.ChaosScenario builtInScenario(String name) {
-        return switch (name.toLowerCase()) {
-            case "split-brain" -> chaos_harness.ChaosScenario.builder("split-brain")
-                    .partitionAt(1000, List.of("node-1"), List.of("node-2", "node-3"))
-                    .healAt(5000)
-                    .build();
-            case "leader-churn" -> chaos_harness.ChaosScenario.builder("leader-churn")
-                    .killAt(1000, "node-1")
-                    .restartAt(5000, "node-1")
-                    .setPartitionAt(8000, Map.of("node-1", 0, "node-2", 1, "node-3", 1))
-                    .healAt(12000)
-                    .build();
-            default -> throw new IllegalArgumentException("unknown scenario: " + name);
-        };
+        return ClusterScenarios.byName(name);
     }
 
-    private static void startupBanner(ClusterSupervisor supervisor, Map<String, Integer> telemetryPort) {
+    private static void startupBanner(ClusterSupervisor supervisor, Map<String, Integer> telemetryPort,
+                                      Map<String, Integer> adminPort, int clusterAdminPort, Path clusterJson) {
         System.out.println("DistribKV — " + supervisor.size() + "-node cluster (single JVM)");
+        System.out.println("  cluster admin (HTTP) = " + clusterAdminPort + "   cluster.json = " + clusterJson.toAbsolutePath());
         for (NodeRunner runner : supervisor.runners()) {
-            System.out.printf("  %-10s raft=%-5d telemetry=%-5d data=%s%n",
+            System.out.printf("  %-10s raft=%-5d telemetry=%-5d admin=%-5d data=%s%n",
                     runner.getNodeId(), runner.getRaftPort(), runner.getTelemetryPort(),
-                    "temp-dir/" + runner.getNodeId());
+                    runner.getAdminPort(), "temp-dir/" + runner.getNodeId());
         }
         System.out.println("Type 'help' for commands, 'quit' to exit.");
     }

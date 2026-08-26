@@ -19,7 +19,12 @@ public class TelemetryBus implements TelemetryPublisher {
     @Override
     public void publish(RaftEvent event) {
         for (TelemetrySubscriber subscriber : subscribers) {
-            subscriber.onEvent(event);
+            try {
+                subscriber.onEvent(event);
+            } catch (RuntimeException ignored) {
+                // a dying subscriber (e.g. a socket that just closed) must never
+                // break publishing to the remaining subscribers
+            }
         }
     }
 

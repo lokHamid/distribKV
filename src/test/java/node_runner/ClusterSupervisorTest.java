@@ -40,13 +40,16 @@ class ClusterSupervisorTest {
     }
 
     private ClusterSupervisor startCluster(int n, Path root) throws Exception {
-        int baseRaft = freePort();
-        int baseTelemetry = freePort();
+        int baseRaft = 20000 + (freePort() % 20000);   // avoid the ephemeral range + port overflow
+        int baseTelemetry = baseRaft + 1000;           // disjoint from raft
+        int baseAdmin = baseRaft + 2000;               // disjoint from both
         Map<String, Integer> raftPorts = new LinkedHashMap<>();
         Map<String, Integer> telemetryPorts = new LinkedHashMap<>();
+        Map<String, Integer> adminPorts = new LinkedHashMap<>();
         for (int i = 0; i < n; i++) {
             raftPorts.put("node-" + (i + 1), baseRaft + i * 10);
             telemetryPorts.put("node-" + (i + 1), baseTelemetry + i * 10);
+            adminPorts.put("node-" + (i + 1), baseAdmin + i * 10);
         }
         Map<String, String> addresses = new LinkedHashMap<>();
         for (int i = 0; i < n; i++) {
@@ -59,7 +62,7 @@ class ClusterSupervisorTest {
             Map<String, String> peers = new LinkedHashMap<>(addresses);
             peers.remove(id);
             supervisor.addNode(new NodeRunnerConfig(id, peers, root.resolve(id),
-                    raftPorts.get(id), telemetryPorts.get(id), 60, 200, 400, 100, 0));
+                    raftPorts.get(id), telemetryPorts.get(id), adminPorts.get(id), 60, 200, 400, 100, 0));
         }
         supervisor.startAll();
         return supervisor;

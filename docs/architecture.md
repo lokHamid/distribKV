@@ -137,12 +137,17 @@ rest. That is what the chaos scenarios demonstrate.
 | Thing | Default | Notes |
 |---|---|---|
 | Raft RPC port (node `i`, 1-based) | `7200 + (i-1)*20` | peer-to-peer consensus |
-| Telemetry port (node `i`) | `8200 + (i-1)*20` | dashboard connects here |
+| Telemetry port (node `i`) | `8200 + (i-1)*20` | dashboard event stream |
+| Per-node admin port (node `i`) | `9200 + (i-1)*20` | per-node status/metrics/control (separate-JVM) |
+| Cluster admin port (single endpoint) | `9000` | single-JVM dashboard control plane |
 | Data dir | `temp-dir/<nodeId>` | per-node state/logs |
 | Heartbeat interval | `60 ms` | |
 | Election timeout | `200..400 ms` (random) | must be >> heartbeat |
 | Max entries per AppendEntries | `100` | |
 | Snapshot threshold | `0` (disabled) | enable by raising it |
+
+A dashboard discovers everything via `cluster.json` (see
+[dashboard-contract.md](./dashboard-contract.md)).
 
 ## What is intentionally *not* here
 

@@ -65,7 +65,8 @@ Main class `node_runner.ClusterSupervisorMain`, program argument = node count
 (default `3`). It assigns ports from fixed bases and starts every node:
 
 ```
-raft base 7200 (step 20), telemetry base 8200 (step 20)
+raft base 7200 (step 20), telemetry base 8200 (step 20), admin base 9200 (step 20),
+cluster admin on 9000
 ```
 
 Commands:
@@ -88,15 +89,18 @@ Commands:
 
 ### Ports
 
-| Node | raft | telemetry |
-|---|---|---|
-| node-1 | 7200 | 8200 |
-| node-2 | 7220 | 8220 |
-| node-3 | 7240 | 8240 |
+| Node | raft | telemetry | admin |
+|---|---|---|---|
+| node-1 | 7200 | 8200 | 9200 |
+| node-2 | 7220 | 8220 | 9220 |
+| node-3 | 7240 | 8240 | 9240 |
 
-A dashboard connects to any node's `telemetry` port; peers connect to the
-`raft` ports. The `data=` shown is a temp directory per node
-(`persistent.bin`, `raft.log`, optional `snapshot-*.bin`).
+Cluster admin (single endpoint, HTTP): **9000**. On start a `cluster.json`
+descriptor is written to the temp data dir (see
+[dashboard-contract.md](./dashboard-contract.md)). A dashboard connects to any
+node's `telemetry` port; peers connect to the `raft` ports; the dashboard drives
+the cluster through the `admin` (HTTP) endpoint. The `data=` shown is a temp
+directory per node (`persistent.bin`, `raft.log`, optional `snapshot-*.bin`).
 
 ## Built-in scenarios
 

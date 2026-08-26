@@ -1,6 +1,7 @@
 // node_runner/NodeRunner.java
 package node_runner;
 
+import chaos_harness.ChaosController;
 import chaos_harness.ChaosRules;
 import chaos_harness.ChaosTransportClient;
 import consensus_core.node.RaftConfig;
@@ -42,6 +43,7 @@ public class NodeRunner {
     private PersistentState persistentState;
     private RaftLog raftLog;
     private KVStateMachine stateMachine;
+    private ChaosAdminServer adminServer;
 
     public NodeRunner(NodeRunnerConfig config, ChaosRules rules) {
         this.config = config;
@@ -116,6 +118,9 @@ public class NodeRunner {
     }
 
     public String getNodeId() { return config.getNodeId(); }
+    public String getHost() { return config.getHost(); }
+    public int getAdminPort() { return config.getAdminPort(); }
+    public ChaosRules getRules() { return rules; }
     public synchronized RaftNode getNode() { return node; }
     public TelemetryBus getTelemetryBus() { return telemetryBus; }
     public MetricsCollector getMetricsCollector() { return metricsCollector; }
@@ -124,4 +129,51 @@ public class NodeRunner {
 
     /** Peer ids in the cluster (excludes this node). */
     public Set<String> getPeerIds() { return config.getPeerAddresses().keySet(); }
+
+    /** Per-node admin server (used in separate-JVM mode). Returns the bound port. */
+    public synchronized int startNodeAdmin() {
+        if (adminServer != null) {
+            return adminServer.getPort();
+        }
+        try {
+            adminServer = new ChaosAdminServer(config.getAdminPort(), nodeAdminBackend());
+            adminServer.start();
+            return adminServer.getPort();
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Failed to start per-node admin server", e);
+        }
+    }
+
+    public synchronized void stopNodeAdmin() {
+        if (adminServer != null) {
+            adminServer.stop();
+            adminServer = null;
+        }
+    }
+
+    private AdminBackend nodeAdminBackend() {
+        return new AdminBackend() {
+            @Override
+            public java.util.List<NodeStatus> statuses() {
+                return java.util.List.of(NodeStatus.fromNode(NodeRunner.this.getNodeId(), NodeRunner.this.getNode()));
+            }
+            @Override
+            public java.util.List<NodeMetrics> metrics() {
+                return java.util.List.of(new NodeMetrics(NodeRunner.this.getNodeId(), metricsCollector.snapshot()));
+            }
+            @Override
+            public ClusterDescriptor cluster() {
+                return new ClusterDescriptor("node-" + NodeRunner.this.getNodeId(), java.util.List.of(
+                        new ClusterDescriptor.NodeEndpoint(getNodeId(), getHost(), getRaftPort(), getTelemetryPort(), getAdminPort())));
+            }
+            @Override
+            public ChaosController controller() {
+                return new NodeRunnerController(NodeRunner.this, rules);
+            }
+            @Override
+            public chaos_harness.ChaosScenario scenarioByName(String name) {
+                return ClusterScenarios.byName(name);
+            }
+        };
+    }
 }

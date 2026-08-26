@@ -16,6 +16,7 @@ together, and how the cluster re-converges *autonomously* after failures.
 | [telemetry.md](./telemetry.md) | Event bus, metrics, and the WebSocket event stream |
 | [chaos-harness.md](./chaos-harness.md) | Fault-injection proxy layer (partition / delay / drop / kill / restart) |
 | [node-runner.md](./node-runner.md) | Boots nodes; the cluster supervisor; the interactive CLI & scenarios |
+| [dashboard-contract.md](./dashboard-contract.md) | The HTTP/WebSocket contract for the JavaFX dashboard |
 | [testing.md](./testing.md) | The automated test suite and what it verifies |
 
 ## What it is
