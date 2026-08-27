@@ -38,6 +38,15 @@ java -cp "<build>;<libs>" org.junit.platform.console.ConsoleLauncher --scan-clas
 | `ChaosTransportClientTest` | `chaos_harness` | pass-through, partition/drop never call the delegate, delayed delivery |
 | `ChaosScenarioRunnerTest` | `chaos_harness` | steps execute in clock order |
 | `ClusterSupervisorTest` | `node_runner` | **3-node cluster:** elect leader → commit a write → **kill the leader → a new leader is elected → commit again** → restart the dead node |
+| `JsonTest` | `node_runner` | JSON encode/parse round-trips, escaping, malformed rejection |
+| `ClusterDescriptorTest` | `node_runner` | descriptor JSON round-trip + `cluster.json` write/read |
+| `NodeStatusTest` | `node_runner` | node status DTO (running + down) JSON round-trip |
+| `ChaosAdminServerTest` | `node_runner` | admin HTTP endpoints over a live server: `/status`, `/metrics`, `/cluster`, `/control/*` |
+
+There is also a small **dashboard test suite** in the sibling
+`DistribKV-dashboard` project (`mvnw test`): `JsonTest` (JSON round-trips) and
+`model.ModelParseTest` (contract DTO parsing). These are deliberately
+non-UI tests so they run headless.
 
 ## Notable invariants the tests lock in
 

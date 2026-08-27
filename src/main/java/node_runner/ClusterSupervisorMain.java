@@ -36,7 +36,7 @@ public final class ClusterSupervisorMain {
     private static final int PORT_STEP = 20;
 
     public static void main(String[] args) throws Exception {
-        int nodeCount = args.length > 0 ? Integer.parseInt(args[0]) : 3;
+        int nodeCount = args.length > 0 ? Integer.parseInt(args[0]) : 6;
         if (nodeCount < 1) {
             throw new IllegalArgumentException("node count must be >= 1");
         }

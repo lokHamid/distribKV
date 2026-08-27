@@ -28,7 +28,7 @@ Layer by layer, and the concrete classes:
 | kv-store | `kv_store` | `KVStore`, `KVStateMachine`, `KVCommandCodec`, `KVResultCodec`, `KVSnapshotCodec` | Apply committed commands to a shared map |
 | telemetry | `telemetry` | `TelemetryBus`, `MetricsCollector`, `TelemetryWebSocketServer`, `RaftEventCodec` | Broadcast events, derive metrics, serve the dashboard |
 | chaos-harness | `chaos_harness` | `ChaosRules`, `ChaosTransportClient`, `ChaosController`, `ChaosScenarioRunner` | Inject network faults & node crashes transparently |
-| node-runner | `node_runner` | `NodeRunner`, `ClusterSupervisor`, `ClusterSupervisorMain` | Wire the above and boot/supervise the cluster |
+| node-runner | `node_runner` | `NodeRunner`, `NodeRunnerController`, `ClusterSupervisor`, `ClusterSupervisorMain`, `ChaosAdminServer`, `ClusterScenarios`, `NodeStatus`, `ClusterDescriptor` | Wire the above and boot/supervise the cluster; expose the dashboard control plane |
 
 ## The two seams the layers plug into
 
@@ -152,7 +152,10 @@ A dashboard discovers everything via `cluster.json` (see
 ## What is intentionally *not* here
 
 - **out of scope / not yet built:** a per-OS-process single-node `main()`, a
-  shared chaos control plane across separate JVMs, the JavaFX dashboard
-  (`dashboard-fx`), the REST facade (`rest-facade`), and the client library.
-  The current `ClusterSupervisorMain` runs the whole cluster in one JVM so that
-  partition/delay/drop stay consistent. See [node-runner.md](./node-runner.md).
+  shared chaos control plane across separate JVMs, the REST facade
+  (`rest-facade`), and the client library. The JavaFX dashboard **is built** as
+  a separate sibling project (`DistribKV-dashboard`) that talks to the cluster
+  over the admin/telemetry contract (see
+  [dashboard-contract.md](./dashboard-contract.md)). The current
+  `ClusterSupervisorMain` runs the whole cluster in one JVM so that
+  partition/delay/drop stay consistent.

@@ -90,15 +90,29 @@ a subscriber and pushes every published `RaftEvent` as a JSON text frame:
 typically opens one WS per node and fans events into a shared model. Events are
 emitted for consensus transitions *and* chaos injections.
 
-## Client-side permission note
+## Dashboard client
 
-Nothing in the backend requires the dashboard to share code. The dashboard only
-needs:
-- a small WebSocket client (to open `/status`-style event sockets), and
-- an HTTP client that can `GET` and `POST`.
+The JavaFX dashboard lives in the sibling project `../DistribKV-dashboard`
+(module `org.lokman.distro_project_visual`, JavaFX 21 + JDK `java.net.http`; no
+extra dependency):
 
-Both are provided by the JDK / JavaFX ecosystem, so no extra dependency is
-required on the dashboard side.
+| Class | Role |
+|---|---|
+| `DashboardApp` | the UI (node cards, chaos controls, metrics, event log) |
+| `ClusterClient` | `fetchCluster`/`fetchStatuses`/`fetchMetrics`, all `control*` actions, and `openTelemetry` |
+| `Json`, `model/*` | JSON parse + contract DTOs (`NodeSummary`, `NodeMetricsInfo`, `ClusterDescriptorInfo`, `RaftEventRecord`) |
+
+It auto-connects to `http://127.0.0.1:9000` by default (change it in the header
+and hit **Connect**). It opens one `openTelemetry` socket per node; each socket
+**auto-reconnects with exponential backoff** and answers WebSocket PINGs, so the
+event stream survives a node being killed/restarted or a brief network pause.
+
+Run it:
+
+```bash
+cd ../DistribKV-dashboard
+mvnw -q javafx:run      # JAVA_HOME must be set; a display is required
+```
 
 ## Default ports (single-JVM supervisor, 3 nodes)
 

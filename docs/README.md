@@ -37,6 +37,9 @@ together, and how the cluster re-converges *autonomously* after failures.
 - **Java 21**, plain Maven project (`pom.xml`).
 - Runtime deps: **Java-WebSocket 1.5.7**, **slf4j-api 2.0.13**.
 - Test deps: **JUnit Jupiter 5.10.2** (via `maven-surefire-plugin`).
+- A separate **JavaFX dashboard** project lives at `../DistribKV-dashboard` (see
+  [dashboard-contract.md](./dashboard-contract.md)) — it has no shared code with
+  the backend; they talk over JSON/WebSocket only.
 
 ## Source layout
 
@@ -83,13 +86,30 @@ It prints each node's ports:
 
 ```
 DistribKV — 3-node cluster (single JVM)
-  node-1   raft=7200  telemetry=8200  data=temp-dir/node-1
-  node-2   raft=7220  telemetry=8220  data=temp-dir/node-2
-  node-3   raft=7240  telemetry=8240  data=temp-dir/node-3
+  cluster admin (HTTP) = 9000   cluster.json = <temp-dir>/cluster.json
+  node-1   raft=7200  telemetry=8200  admin=9200  data=temp-dir/node-1
+  node-2   raft=7220  telemetry=8220  admin=9220  data=temp-dir/node-2
+  node-3   raft=7240  telemetry=8240  admin=9240  data=temp-dir/node-3
 ```
 
 - `raft=` is the port peers use for consensus RPCs.
 - `telemetry=` is the WebSocket port a **dashboard** connects to for live events.
+- `admin=` is the per-node admin/control port (separate-JVM mode).
+- `cluster admin (HTTP)` is the single cluster-wide control endpoint the
+  dashboard drives by default; `cluster.json` is a machine-readable descriptor.
+
+## Run the dashboard
+
+The JavaFX dashboard is a sibling project. Run the backend cluster first, then:
+
+```bash
+cd ../DistribKV-dashboard
+mvnw -q javafx:run      # needs JAVA_HOME set; default connects to http://127.0.0.1:9000
+```
+
+It auto-discovers nodes from `/cluster`, opens one telemetry socket per node and
+polls status/metrics. You can change the admin URL in the header and hit
+**Connect**. See [dashboard-contract.md](./dashboard-contract.md).
 
 ## Quickstart
 
