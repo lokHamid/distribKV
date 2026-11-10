@@ -2,29 +2,25 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME     = 'my-springboot-app'
-    CONTAINER_NAME = 'my-springboot-app'
-  }
-
-  triggers {
-    pollSCM('H/2 * * * *')   // check Git every 2 minutes
+    IMAGE_NAME     = 'distribkv'
+    CONTAINER_NAME = 'distribkv'
   }
 
   stages {
-    stage('Build') {
-      steps {
-        bat 'mvnw.cmd clean package -DskipTests'
-      }
-    }
-
     stage('Test') {
       steps {
-        bat 'mvnw.cmd test'
+        bat 'mvnw.cmd clean test'
       }
       post {
         always {
-          junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+          junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
         }
+      }
+    }
+
+    stage('Package') {
+      steps {
+        bat 'mvnw.cmd package -DskipTests'
       }
     }
 
@@ -43,7 +39,7 @@ pipeline {
   }
 
   post {
-    success { echo 'Pipeline OK. App running on http://localhost:8081' }
+    success { echo 'Pipeline OK' }
     failure { echo 'Pipeline failed. Check the Console Output.' }
   }
 }
