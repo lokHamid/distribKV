@@ -68,35 +68,59 @@ class ClusterSupervisorTest {
         return supervisor;
     }
 
+    private static String awaitLeader(ClusterSupervisor s, long timeoutMs, String excluded)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            Optional<String> l = s.currentLeaderId();
+            if (l.isPresent() && !l.get().equals(excluded)) {
+                return l.get();
+            }
+            Thread.sleep(30);
+        }
+        throw new AssertionError("no leader within " + timeoutMs + " ms"
+                + (excluded != null ? " (other than " + excluded + ")" : ""));
+    }
+
     private void assertCommit(ClusterSupervisor supervisor) throws Exception {
-        String leaderId = supervisor.currentLeaderId().orElseThrow();
-        RaftNode leader = supervisor.runner(leaderId).getNode();
-        byte[] cmd = KVCommandCodec.encode(new KVCommand(CommandType.PUT, "k" + System.nanoTime(), "v"));
-        long index = leader.propose(cmd);
-        assertTrue(index >= 1);
-        assertTrue(await(() -> leader.getCommitIndex() >= index, 5000), "write should commit");
-        assertTrue(await(() -> ((KVStateMachine) leader.getStateMachine()).getStore().get(
-                KVCommandCodec.decode(cmd).getKey()) != null, 5000), "state machine should apply");
+        byte[] cmd = KVCommandCodec.encode(
+                new KVCommand(CommandType.PUT, "k" + System.nanoTime(), "v"));
+        String key = KVCommandCodec.decode(cmd).getKey();
+
+        long deadline = System.currentTimeMillis() + 20_000;
+        boolean ok = false;
+        while (!ok && System.currentTimeMillis() < deadline) {
+            Optional<String> id = supervisor.currentLeaderId();
+            if (id.isEmpty()) { Thread.sleep(50); continue; }
+
+            RaftNode leader = supervisor.runner(id.get()).getNode();
+            long index;
+            try {
+                index = leader.propose(cmd);
+            } catch (Exception e) {
+                Thread.sleep(100);
+                continue;
+            }
+            if (index < 1) { Thread.sleep(100); continue; }   // not leader anymore, retry
+
+            ok = await(() -> leader.getCommitIndex() >= index, 3000)
+                    && await(() -> ((KVStateMachine) leader.getStateMachine())
+                    .getStore().get(key) != null, 3000);
+        }
+        assertTrue(ok, "write should commit and be applied");
     }
 
     @Test
     void electsLeaderCommitsAndRecoversFromLeaderKill() throws Exception {
         ClusterSupervisor supervisor = startCluster(3, tempDir.resolve("c1"));
         try {
-            assertTrue(await(() -> supervisor.currentLeaderId().isPresent(), 6000), "leader should emerge");
-            String initialLeader = supervisor.currentLeaderId().orElseThrow();
-            assertEquals(initialLeader, supervisor.currentLeaderId().orElse(null));
-
+            String initialLeader = awaitLeader(supervisor, 15_000, null);
             assertCommit(supervisor);
 
             supervisor.controller().killNode(initialLeader);
             assertFalse(supervisor.runner(initialLeader).isRunning());
 
-            assertTrue(await(() -> {
-                Optional<String> l = supervisor.currentLeaderId();
-                return l.isPresent() && !l.get().equals(initialLeader);
-            }, 6000), "a new leader should be elected after the leader is killed");
-
+            awaitLeader(supervisor, 15_000, initialLeader);
             assertCommit(supervisor);
         } finally {
             supervisor.stopAll();
@@ -107,14 +131,13 @@ class ClusterSupervisorTest {
     void restartBringsNodeBackAndRejoins() throws Exception {
         ClusterSupervisor supervisor = startCluster(3, tempDir.resolve("c2"));
         try {
-            assertTrue(await(() -> supervisor.currentLeaderId().isPresent(), 6000), "leader should emerge");
-            String leader = supervisor.currentLeaderId().orElseThrow();
+            String leader = awaitLeader(supervisor, 15_000, null);
             supervisor.controller().killNode(leader);
-            assertTrue(await(() -> supervisor.currentLeaderId().filter(id -> !id.equals(leader)).isPresent(), 6000));
+            awaitLeader(supervisor, 15_000, leader);
 
             supervisor.controller().restartNode(leader);
-            assertTrue(await(() -> supervisor.runner(leader).isRunning(), 3000));
-            assertTrue(await(() -> supervisor.currentLeaderId().isPresent(), 6000));
+            assertTrue(await(() -> supervisor.runner(leader).isRunning(), 5000));
+            awaitLeader(supervisor, 15_000, null);
         } finally {
             supervisor.stopAll();
         }

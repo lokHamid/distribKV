@@ -7,6 +7,7 @@ import chaos_harness.ChaosScenario;
 import chaos_harness.ChaosScenarioRunner;
 import consensus_core.api.EventType;
 import consensus_core.api.RaftEvent;
+import consensus_core.node.RaftNode;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,8 +57,8 @@ public class ClusterSupervisor {
                 .filter(NodeRunner::isRunning)
                 .map(NodeRunner::getNode)
                 .filter(n -> n != null && n.isLeader())
-                .map(n -> n.getNodeId())
-                .findFirst();
+                .max(java.util.Comparator.comparingLong(RaftNode::getCurrentTerm))
+                .map(RaftNode::getNodeId);
     }
 
     public ChaosController controller() {
